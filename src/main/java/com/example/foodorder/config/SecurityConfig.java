@@ -44,7 +44,8 @@ public class SecurityConfig {
                                 "/api/categories/**",
                                 "/api/foods/**",
                                 "/api/cart/**",
-                                "/api/orders/**"
+                                "/api/orders/**",
+                                "/api/payments/**"
                         )
                         .permitAll()
 
