@@ -6,6 +6,7 @@ import com.example.foodorder.service.FoodService;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ public class FoodController {
     private final FoodService foodService;
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<FoodItem> createFood(
             @RequestBody FoodItem foodItem) {
 
@@ -45,6 +47,7 @@ public class FoodController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> deleteFood(
             @PathVariable Long id) {
 
