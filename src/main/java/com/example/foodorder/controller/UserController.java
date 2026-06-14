@@ -1,5 +1,6 @@
 package com.example.foodorder.controller;
 
+import com.example.foodorder.dto.UserResponse;
 import com.example.foodorder.exception.ResourceNotFoundException;
 import com.example.foodorder.entity.User;
 import com.example.foodorder.repository.UserRepository;
@@ -8,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
@@ -17,12 +19,17 @@ public class UserController {
     private final UserRepository userRepository;
 
     @GetMapping
-    public ResponseEntity<List<User>> getAllUsers() {
-        return ResponseEntity.ok(userRepository.findAll());
+    public ResponseEntity<List<UserResponse>> getAllUsers() {
+        return ResponseEntity.ok(
+                userRepository.findAll()
+                        .stream()
+                        .map(UserResponse::from)
+                        .collect(Collectors.toList())
+        );
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<User> getUserById(
+    public ResponseEntity<UserResponse> getUserById(
             @PathVariable Long id
     ) {
 
@@ -30,6 +37,6 @@ public class UserController {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("User not found"));
 
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(UserResponse.from(user));
     }
 }

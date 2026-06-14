@@ -1,6 +1,7 @@
 package com.example.foodorder.service;
 
 import com.example.foodorder.entity.Category;
+import com.example.foodorder.exception.BadRequestException;
 import com.example.foodorder.exception.ResourceNotFoundException;
 import com.example.foodorder.repository.CategoryRepository;
 
@@ -22,6 +23,8 @@ public class CategoryService {
             Category category
     ) {
 
+        normalizeAndValidateCategoryName(category, null);
+
         Category savedCategory = categoryRepository.save(category);
         log.info("Category created with id {}", savedCategory.getId());
         return savedCategory;
@@ -40,6 +43,8 @@ public class CategoryService {
                 categoryRepository.findById(id)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException("Category not found"));
+
+        normalizeAndValidateCategoryName(category, id);
 
         existingCategory.setName(
                 category.getName()
@@ -64,5 +69,29 @@ public class CategoryService {
 
         categoryRepository.deleteById(id);
         log.info("Category deleted with id {}", id);
+    }
+
+    private void normalizeAndValidateCategoryName(
+            Category category,
+            Long existingCategoryId
+    ) {
+
+        if (category.getName() == null || category.getName().isBlank()) {
+            throw new BadRequestException("Category name is required");
+        }
+
+        String normalizedName = category.getName().trim();
+        boolean duplicateExists = existingCategoryId == null
+                ? categoryRepository.existsByNormalizedName(normalizedName)
+                : categoryRepository.existsByNormalizedNameAndIdNot(
+                        normalizedName,
+                        existingCategoryId
+                );
+
+        if (duplicateExists) {
+            throw new BadRequestException("Category already exists");
+        }
+
+        category.setName(normalizedName);
     }
 }

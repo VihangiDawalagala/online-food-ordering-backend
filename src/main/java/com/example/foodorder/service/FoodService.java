@@ -1,7 +1,10 @@
 package com.example.foodorder.service;
 
+import com.example.foodorder.entity.Category;
 import com.example.foodorder.entity.FoodItem;
+import com.example.foodorder.exception.BadRequestException;
 import com.example.foodorder.exception.ResourceNotFoundException;
+import com.example.foodorder.repository.CategoryRepository;
 import com.example.foodorder.repository.FoodRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -17,8 +20,10 @@ import java.util.List;
 public class FoodService {
 
     private final FoodRepository foodRepository;
+    private final CategoryRepository categoryRepository;
 
     public FoodItem saveFood(FoodItem foodItem) {
+        foodItem.setCategory(resolveCategory(foodItem));
         FoodItem savedFood = foodRepository.save(foodItem);
         log.info("Food item created with id {}", savedFood.getId());
         return savedFood;
@@ -49,7 +54,7 @@ public class FoodService {
         existingFood.setPrice(foodItem.getPrice());
         existingFood.setImageUrl(foodItem.getImageUrl());
         existingFood.setStatus(foodItem.getStatus());
-        existingFood.setCategory(foodItem.getCategory());
+        existingFood.setCategory(resolveCategory(foodItem));
 
         FoodItem updatedFood = foodRepository.save(existingFood);
         log.info("Food item updated with id {}", updatedFood.getId());
@@ -63,5 +68,16 @@ public class FoodService {
 
         foodRepository.deleteById(id);
         log.info("Food item deleted with id {}", id);
+    }
+
+    private Category resolveCategory(FoodItem foodItem) {
+        if (foodItem.getCategory() == null ||
+                foodItem.getCategory().getId() == null) {
+            throw new BadRequestException("Category id is required");
+        }
+
+        return categoryRepository.findById(foodItem.getCategory().getId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Category not found"));
     }
 }

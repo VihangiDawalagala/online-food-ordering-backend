@@ -6,6 +6,7 @@ import com.example.foodorder.dto.SignInRequest;
 import com.example.foodorder.dto.SignUpRequest;
 import com.example.foodorder.entity.Cart;
 import com.example.foodorder.entity.CartItem;
+import com.example.foodorder.entity.Category;
 import com.example.foodorder.entity.FoodItem;
 import com.example.foodorder.entity.FoodStatus;
 import com.example.foodorder.entity.Order;
@@ -14,8 +15,10 @@ import com.example.foodorder.entity.Payment;
 import com.example.foodorder.entity.PaymentStatus;
 import com.example.foodorder.entity.Role;
 import com.example.foodorder.entity.User;
+import com.example.foodorder.exception.BadRequestException;
 import com.example.foodorder.repository.CartItemRepository;
 import com.example.foodorder.repository.CartRepository;
+import com.example.foodorder.repository.CategoryRepository;
 import com.example.foodorder.repository.FoodRepository;
 import com.example.foodorder.repository.OrderRepository;
 import com.example.foodorder.repository.PaymentRepository;
@@ -23,6 +26,7 @@ import com.example.foodorder.repository.UserRepository;
 import com.example.foodorder.security.JwtUtil;
 import com.example.foodorder.service.AuthService;
 import com.example.foodorder.service.CartService;
+import com.example.foodorder.service.CategoryService;
 import com.example.foodorder.service.OrderService;
 import com.example.foodorder.service.PaymentService;
 import org.junit.jupiter.api.Test;
@@ -31,19 +35,26 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentCaptor.forClass;
+import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -82,7 +93,77 @@ class FoodOrderFeatureTests {
 
         assertEquals("jwt-token", response.getToken());
         assertEquals("CUSTOMER", response.getRole());
-        verify(userRepository).save(any(User.class));
+        ArgumentCaptor<User> userCaptor = forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertEquals(Role.CUSTOMER, userCaptor.getValue().getRole());
+    }
+
+    @Test
+    void signUpAcceptsAdminRoleAndReturnsAdminJwt() {
+        UserRepository userRepository = mock(UserRepository.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        JwtUtil jwtUtil = mock(JwtUtil.class);
+        AuthenticationManager authenticationManager = mock(AuthenticationManager.class);
+        UserDetailsService userDetailsService = mock(UserDetailsService.class);
+        UserDetails userDetails = mock(UserDetails.class);
+
+        when(userRepository.existsByEmail("admin@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("password123")).thenReturn("encoded-password");
+        when(userDetailsService.loadUserByUsername("admin@example.com")).thenReturn(userDetails);
+        when(jwtUtil.generateToken(userDetails)).thenReturn("admin-jwt-token");
+
+        AuthService authService = new AuthService(
+                userRepository,
+                passwordEncoder,
+                jwtUtil,
+                authenticationManager,
+                userDetailsService
+        );
+
+        SignUpRequest request = new SignUpRequest();
+        request.setName("Admin One");
+        request.setEmail("admin@example.com");
+        request.setPassword("password123");
+        request.setRole(" ADMIN ");
+
+        AuthResponse response = authService.signUp(request);
+
+        assertEquals("admin-jwt-token", response.getToken());
+        assertEquals("ADMIN", response.getRole());
+
+        ArgumentCaptor<User> userCaptor = forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertEquals(Role.ADMIN, userCaptor.getValue().getRole());
+    }
+
+    @Test
+    void signUpRejectsInvalidRole() {
+        UserRepository userRepository = mock(UserRepository.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        JwtUtil jwtUtil = mock(JwtUtil.class);
+        AuthenticationManager authenticationManager = mock(AuthenticationManager.class);
+        UserDetailsService userDetailsService = mock(UserDetailsService.class);
+
+        AuthService authService = new AuthService(
+                userRepository,
+                passwordEncoder,
+                jwtUtil,
+                authenticationManager,
+                userDetailsService
+        );
+
+        SignUpRequest request = new SignUpRequest();
+        request.setName("Bad Role User");
+        request.setEmail("bad@example.com");
+        request.setPassword("password123");
+        request.setRole("MANAGER");
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> authService.signUp(request)
+        );
+
+        assertEquals("Invalid role. Allowed roles are ADMIN and CUSTOMER", exception.getMessage());
     }
 
     @Test
@@ -99,7 +180,7 @@ class FoodOrderFeatureTests {
                 .name("Customer One")
                 .email("customer@example.com")
                 .password("encoded-password")
-                .role(Role.CUSTOMER)
+                .role(Role.ADMIN)
                 .build();
 
         when(userRepository.findByEmail("customer@example.com")).thenReturn(Optional.of(user));
@@ -122,7 +203,31 @@ class FoodOrderFeatureTests {
 
         assertEquals(1L, response.getId());
         assertEquals("jwt-token", response.getToken());
+        assertEquals("ADMIN", response.getRole());
         verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+    }
+
+    @Test
+    void jwtIncludesRoleAndAuthorities() {
+        JwtUtil jwtUtil = new JwtUtil();
+        ReflectionTestUtils.setField(
+                jwtUtil,
+                "secret",
+                "ThisIsASecretKeyForFoodOrderingJWT123456789"
+        );
+        ReflectionTestUtils.setField(jwtUtil, "expiration", 86400000L);
+
+        UserDetails adminDetails = new org.springframework.security.core.userdetails.User(
+                "admin@example.com",
+                "password",
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
+        );
+
+        String token = jwtUtil.generateToken(adminDetails);
+
+        assertEquals("admin@example.com", jwtUtil.extractEmail(token));
+        assertEquals("ADMIN", jwtUtil.extractRole(token));
+        assertTrue(jwtUtil.isTokenValid(token, adminDetails));
     }
 
     @Test
@@ -136,6 +241,27 @@ class FoodOrderFeatureTests {
 
         assertNotNull(preAuthorize);
         assertEquals("hasRole('ADMIN')", preAuthorize.value());
+    }
+
+    @Test
+    void duplicateCategoryNamesAreBlockedIgnoringCaseAndSpaces() {
+        CategoryRepository categoryRepository = mock(CategoryRepository.class);
+        when(categoryRepository.existsByNormalizedName("Pizza")).thenReturn(true);
+
+        CategoryService categoryService = new CategoryService(categoryRepository);
+
+        Category category = Category.builder()
+                .name(" Pizza ")
+                .description("Italian food")
+                .build();
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> categoryService.createCategory(category)
+        );
+
+        assertEquals("Category already exists", exception.getMessage());
+        verify(categoryRepository).existsByNormalizedName(eq("Pizza"));
     }
 
     @Test

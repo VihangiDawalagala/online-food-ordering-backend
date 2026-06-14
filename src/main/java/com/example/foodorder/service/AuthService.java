@@ -34,15 +34,17 @@ public class AuthService {
             throw new IllegalArgumentException("Email already exists");
         }
 
+        Role selectedRole = resolveRole(request.getRole());
+
         User user = User.builder()
                 .name(request.getName())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(Role.CUSTOMER)
+                .role(selectedRole)
                 .build();
 
         userRepository.save(user);
-        log.info("New customer registered with email {}", user.getEmail());
+        log.info("New {} registered with email {}", user.getRole(), user.getEmail());
 
         UserDetails userDetails =
                 userDetailsService.loadUserByUsername(
@@ -95,5 +97,17 @@ public class AuthService {
                 user.getName(),
                 user.getRole().name()
         );
+    }
+
+    private Role resolveRole(String requestedRole) {
+        if (requestedRole == null || requestedRole.isBlank()) {
+            return Role.CUSTOMER;
+        }
+
+        try {
+            return Role.valueOf(requestedRole.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid role. Allowed roles are ADMIN and CUSTOMER");
+        }
     }
 }
