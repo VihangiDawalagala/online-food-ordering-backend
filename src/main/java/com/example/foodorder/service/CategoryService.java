@@ -10,7 +10,10 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -31,7 +34,14 @@ public class CategoryService {
     }
 
     public List<Category> getAllCategories() {
-        return categoryRepository.findAll();
+        Map<String, Category> uniqueCategories = new LinkedHashMap<>();
+
+        for (Category category : categoryRepository.findAll()) {
+            String normalizedName = category.getName().trim().toLowerCase();
+            uniqueCategories.putIfAbsent(normalizedName, category);
+        }
+
+        return new ArrayList<>(uniqueCategories.values());
     }
 
     public Category updateCategory(

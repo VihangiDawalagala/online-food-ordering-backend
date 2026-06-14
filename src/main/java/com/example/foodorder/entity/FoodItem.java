@@ -28,6 +28,6 @@ public class FoodItem {
     private FoodStatus status;
 
     @ManyToOne
-    @JoinColumn(name = "category_id")
+    @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 }

@@ -4,6 +4,7 @@ import com.example.foodorder.entity.Cart;
 import com.example.foodorder.entity.CartItem;
 import com.example.foodorder.entity.Role;
 import com.example.foodorder.entity.User;
+import com.example.foodorder.exception.BadRequestException;
 import com.example.foodorder.exception.ResourceNotFoundException;
 import com.example.foodorder.repository.CartItemRepository;
 import com.example.foodorder.repository.UserRepository;
@@ -77,6 +78,66 @@ public class CartController {
         return ResponseEntity.ok("Removed");
     }
 
+    @RequestMapping(
+            value = {
+                    "/update/{cartItemId}",
+                    "/items/{cartItemId}",
+                    "/{cartItemId}"
+            },
+            method = {
+                    RequestMethod.PUT,
+                    RequestMethod.PATCH
+            }
+    )
+    public ResponseEntity<Cart> updateCartItemQuantity(
+            @PathVariable Long cartItemId,
+            @RequestBody(required = false) Map<String, Object> request,
+            @RequestParam(required = false) Integer quantity,
+            Authentication authentication
+    ) {
+
+        verifyCartItemAccess(cartItemId, authentication);
+
+        Integer updatedQuantity = resolveQuantity(request, quantity);
+
+        return ResponseEntity.ok(
+                cartService.updateCartItemQuantity(
+                        cartItemId,
+                        updatedQuantity
+                )
+        );
+    }
+
+    @RequestMapping(
+            value = "/update",
+            method = {
+                    RequestMethod.PUT,
+                    RequestMethod.PATCH
+            }
+    )
+    public ResponseEntity<Cart> updateCartItemQuantity(
+            @RequestBody Map<String, Object> request,
+            Authentication authentication
+    ) {
+
+        if (request == null || request.get("cartItemId") == null) {
+            throw new BadRequestException("Cart item id is required");
+        }
+
+        Long cartItemId = Long.valueOf(
+                request.get("cartItemId").toString()
+        );
+
+        verifyCartItemAccess(cartItemId, authentication);
+
+        return ResponseEntity.ok(
+                cartService.updateCartItemQuantity(
+                        cartItemId,
+                        resolveQuantity(request, null)
+                )
+        );
+    }
+
     private void verifyUserAccess(
             Long userId,
             Authentication authentication
@@ -117,5 +178,23 @@ public class CartController {
         return userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Authenticated user not found"));
+    }
+
+    private Integer resolveQuantity(
+            Map<String, Object> request,
+            Integer queryQuantity
+    ) {
+
+        if (queryQuantity != null) {
+            return queryQuantity;
+        }
+
+        if (request == null || request.get("quantity") == null) {
+            throw new BadRequestException("Quantity is required");
+        }
+
+        return Integer.valueOf(
+                request.get("quantity").toString()
+        );
     }
 }

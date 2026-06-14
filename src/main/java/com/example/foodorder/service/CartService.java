@@ -101,4 +101,30 @@ public class CartService {
         cartItemRepository.deleteById(cartItemId);
         log.info("Cart item removed with id {}", cartItemId);
     }
+
+    public Cart updateCartItemQuantity(
+            Long cartItemId,
+            Integer quantity
+    ) {
+
+        if (quantity == null || quantity <= 0) {
+            throw new BadRequestException("Quantity must be greater than zero");
+        }
+
+        CartItem cartItem = cartItemRepository.findById(cartItemId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Cart item not found"));
+
+        cartItem.setQuantity(quantity);
+        cartItemRepository.save(cartItem);
+
+        Cart savedCart = cartRepository.save(cartItem.getCart());
+        log.info(
+                "Cart item {} quantity updated to {}",
+                cartItemId,
+                quantity
+        );
+
+        return savedCart;
+    }
 }

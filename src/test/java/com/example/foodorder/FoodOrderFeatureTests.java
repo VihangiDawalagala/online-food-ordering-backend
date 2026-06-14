@@ -26,6 +26,7 @@ import com.example.foodorder.repository.UserRepository;
 import com.example.foodorder.security.JwtUtil;
 import com.example.foodorder.service.AuthService;
 import com.example.foodorder.service.CartService;
+import com.example.foodorder.service.FoodService;
 import com.example.foodorder.service.CategoryService;
 import com.example.foodorder.service.OrderService;
 import com.example.foodorder.service.PaymentService;
@@ -265,6 +266,59 @@ class FoodOrderFeatureTests {
     }
 
     @Test
+    void foodCreationUsesCategoryIdFromRequestBody() {
+        FoodRepository foodRepository = mock(FoodRepository.class);
+        CategoryRepository categoryRepository = mock(CategoryRepository.class);
+        Category burger = Category.builder()
+                .id(2L)
+                .name("Burger")
+                .build();
+        FoodItem request = FoodItem.builder()
+                .name("Burger Deluxe")
+                .description("Juicy Beef Burger")
+                .price(1800.0)
+                .imageUrl("burger.jpg")
+                .status(FoodStatus.AVAILABLE)
+                .category(Category.builder().id(2L).build())
+                .build();
+
+        when(categoryRepository.findById(2L)).thenReturn(Optional.of(burger));
+        when(foodRepository.save(any(FoodItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        FoodService foodService = new FoodService(
+                foodRepository,
+                categoryRepository
+        );
+
+        FoodItem savedFood = foodService.saveFood(request);
+
+        assertSame(burger, savedFood.getCategory());
+        verify(categoryRepository).findById(2L);
+    }
+
+    @Test
+    void foodCreationRejectsMissingCategoryId() {
+        FoodRepository foodRepository = mock(FoodRepository.class);
+        CategoryRepository categoryRepository = mock(CategoryRepository.class);
+        FoodService foodService = new FoodService(
+                foodRepository,
+                categoryRepository
+        );
+
+        FoodItem request = FoodItem.builder()
+                .name("Burger Deluxe")
+                .category(Category.builder().build())
+                .build();
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> foodService.saveFood(request)
+        );
+
+        assertEquals("Category id is required", exception.getMessage());
+    }
+
+    @Test
     void addFoodToCartAddsItemForUser() {
         CartRepository cartRepository = mock(CartRepository.class);
         UserRepository userRepository = mock(UserRepository.class);
@@ -302,6 +356,40 @@ class FoodOrderFeatureTests {
         assertEquals(1, updatedCart.getCartItems().size());
         assertEquals(2, updatedCart.getCartItems().get(0).getQuantity());
         assertSame(foodItem, updatedCart.getCartItems().get(0).getFoodItem());
+    }
+
+    @Test
+    void updateCartItemQuantitySavesNewQuantity() {
+        CartRepository cartRepository = mock(CartRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        FoodRepository foodRepository = mock(FoodRepository.class);
+        CartItemRepository cartItemRepository = mock(CartItemRepository.class);
+        Cart cart = Cart.builder()
+                .id(3L)
+                .cartItems(new ArrayList<>())
+                .build();
+        CartItem cartItem = CartItem.builder()
+                .id(4L)
+                .cart(cart)
+                .quantity(2)
+                .build();
+        cart.getCartItems().add(cartItem);
+
+        when(cartItemRepository.findById(4L)).thenReturn(Optional.of(cartItem));
+        when(cartItemRepository.save(cartItem)).thenReturn(cartItem);
+        when(cartRepository.save(cart)).thenReturn(cart);
+
+        CartService cartService = new CartService(
+                cartRepository,
+                userRepository,
+                foodRepository,
+                cartItemRepository
+        );
+
+        Cart updatedCart = cartService.updateCartItemQuantity(4L, 1);
+
+        assertEquals(1, updatedCart.getCartItems().get(0).getQuantity());
+        verify(cartItemRepository).save(cartItem);
     }
 
     @Test
