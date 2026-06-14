@@ -208,5 +208,5 @@ http://localhost:5174
 GitHub repository link:
 
 ```text
-Add your GitHub repository URL here after pushing the project.
+https://github.com/VihangiDawalagala/online-food-ordering-backend
 ```
