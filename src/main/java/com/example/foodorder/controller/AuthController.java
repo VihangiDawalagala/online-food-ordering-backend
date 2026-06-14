@@ -6,6 +6,7 @@ import com.example.foodorder.dto.SignUpRequest;
 
 import com.example.foodorder.service.AuthService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.ResponseEntity;
@@ -15,14 +16,13 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class AuthController {
 
     private final AuthService authService;
 
     @PostMapping("/signup")
     public ResponseEntity<AuthResponse> signUp(
-            @RequestBody SignUpRequest request
+            @Valid @RequestBody SignUpRequest request
     ) {
 
         return ResponseEntity.ok(
@@ -32,7 +32,7 @@ public class AuthController {
 
     @PostMapping("/signin")
     public ResponseEntity<AuthResponse> signIn(
-            @RequestBody SignInRequest request
+            @Valid @RequestBody SignInRequest request
     ) {
 
         return ResponseEntity.ok(

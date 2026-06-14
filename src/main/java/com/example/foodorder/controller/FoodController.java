@@ -14,7 +14,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/foods")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class FoodController {
 
     private final FoodService foodService;
@@ -46,6 +45,21 @@ public class FoodController {
         );
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<FoodItem> updateFood(
+            @PathVariable Long id,
+            @RequestBody FoodItem foodItem
+    ) {
+
+        return ResponseEntity.ok(
+                foodService.updateFood(
+                        id,
+                        foodItem
+                )
+        );
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> deleteFood(
@@ -53,6 +67,8 @@ public class FoodController {
 
         foodService.deleteFood(id);
 
-        return ResponseEntity.ok("Food deleted successfully");
+        return ResponseEntity.ok(
+                "Food deleted successfully"
+        );
     }
 }

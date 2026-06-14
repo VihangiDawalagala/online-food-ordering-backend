@@ -21,7 +21,7 @@ public class Cart {
     private Long id;
 
     @OneToOne
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", unique = true)
     private User user;
 
     @OneToMany(
@@ -30,5 +30,6 @@ public class Cart {
             orphanRemoval = true
     )
     @JsonManagedReference
+    @Builder.Default
     private List<CartItem> cartItems = new ArrayList<>();
 }

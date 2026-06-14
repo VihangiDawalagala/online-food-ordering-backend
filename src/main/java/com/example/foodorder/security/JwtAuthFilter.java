@@ -1,5 +1,6 @@
 package com.example.foodorder.security;
 
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,7 +39,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
-        String email = jwtUtil.extractEmail(token);
+        String email;
+
+        try {
+            email = jwtUtil.extractEmail(token);
+        } catch (JwtException | IllegalArgumentException ex) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"message\":\"Invalid or expired token\",\"status\":401}");
+            return;
+        }
 
         if (email != null &&
                 SecurityContextHolder.getContext().getAuthentication() == null) {

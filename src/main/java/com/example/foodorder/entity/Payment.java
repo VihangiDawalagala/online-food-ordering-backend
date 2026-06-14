@@ -1,5 +1,6 @@
 package com.example.foodorder.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,7 +22,8 @@ public class Payment {
     @Enumerated(EnumType.STRING)
     private PaymentStatus status;
 
+    @JsonIgnore
     @OneToOne
-    @JoinColumn(name = "order_id")
+    @JoinColumn(name = "order_id", unique = true)
     private Order order;
 }

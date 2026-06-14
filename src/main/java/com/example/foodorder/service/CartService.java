@@ -1,16 +1,18 @@
 package com.example.foodorder.service;
 
 import com.example.foodorder.entity.*;
+import com.example.foodorder.exception.BadRequestException;
+import com.example.foodorder.exception.ResourceNotFoundException;
 import com.example.foodorder.repository.*;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
-
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CartService {
 
     private final CartRepository cartRepository;
@@ -22,7 +24,7 @@ public class CartService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found"));
+                        new ResourceNotFoundException("User not found"));
 
         return cartRepository.findByUser(user)
                 .orElseGet(() -> {
@@ -43,20 +45,60 @@ public class CartService {
 
         Cart cart = getCartByUser(userId);
 
+        if (quantity == null || quantity <= 0) {
+            throw new BadRequestException("Quantity must be greater than zero");
+        }
+
         FoodItem foodItem = foodRepository.findById(foodId)
                 .orElseThrow(() ->
-                        new RuntimeException("Food not found"));
+                        new ResourceNotFoundException("Food not found"));
 
-        CartItem cartItem = CartItem.builder()
-                .cart(cart)
-                .foodItem(foodItem)
-                .quantity(quantity)
-                .build();
+        CartItem existingItem = cart.getCartItems()
+                .stream()
+                .filter(item ->
+                        item.getFoodItem().getId()
+                                .equals(foodId))
+                .findFirst()
+                .orElse(null);
 
-        cartItemRepository.save(cartItem);
+        if (existingItem != null) {
 
-        cart.getCartItems().add(cartItem);
+            existingItem.setQuantity(
+                    existingItem.getQuantity() + quantity
+            );
 
-        return cartRepository.save(cart);
+            cartItemRepository.save(existingItem);
+
+        } else {
+
+            CartItem cartItem = CartItem.builder()
+                    .cart(cart)
+                    .foodItem(foodItem)
+                    .quantity(quantity)
+                    .build();
+
+            cartItemRepository.save(cartItem);
+
+            cart.getCartItems().add(cartItem);
+        }
+
+        Cart savedCart = cartRepository.save(cart);
+        log.info(
+                "Food item {} added to cart for user {} with quantity {}",
+                foodId,
+                userId,
+                quantity
+        );
+
+        return savedCart;
+    }
+
+    public void removeCartItem(Long cartItemId) {
+        if (!cartItemRepository.existsById(cartItemId)) {
+            throw new ResourceNotFoundException("Cart item not found");
+        }
+
+        cartItemRepository.deleteById(cartItemId);
+        log.info("Cart item removed with id {}", cartItemId);
     }
 }
